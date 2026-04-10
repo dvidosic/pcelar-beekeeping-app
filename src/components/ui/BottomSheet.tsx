@@ -56,12 +56,14 @@ export function BottomSheet({
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
+      hardwareAccelerated
     >
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
         pointerEvents="box-none"
+        enabled={Platform.OS === 'ios'}
       >
         <Animated.View
           style={[

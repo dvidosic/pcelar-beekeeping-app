@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  Keyboard,
   StyleSheet,
 } from 'react-native';
 import { DateTimePickerField } from '@/components/ui/DateTimePickerField';
@@ -84,10 +83,8 @@ export function FeedingForm({ hiveId, onSubmit }: FeedingFormProps) {
           onChangeText={setQuantityKg}
           placeholder={L.unesiteKolicinu}
           placeholderTextColor={colors.disabledText}
-          keyboardType="decimal-pad"
+          keyboardType="numeric"
           returnKeyType="done"
-          blurOnSubmit={false}
-          onSubmitEditing={() => Keyboard.dismiss()}
         />
       </FormField>
 
