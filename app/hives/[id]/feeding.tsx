@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useGlobalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FAB } from '@/components/ui/FAB';
@@ -17,7 +17,7 @@ import { spacing } from '@/constants/spacing';
 import { L } from '@/constants/labels';
 
 export default function FeedingTab() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useGlobalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { feedings, isLoading, refresh, addFeeding, removeFeeding } = useFeedingLogs(id);
   const [sheetVisible, setSheetVisible] = useState(false);

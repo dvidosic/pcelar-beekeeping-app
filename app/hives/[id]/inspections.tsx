@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FAB } from '@/components/ui/FAB';
@@ -16,7 +16,7 @@ import { spacing } from '@/constants/spacing';
 import { L } from '@/constants/labels';
 
 export default function InspectionsTab() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useGlobalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { inspections, isLoading, refresh, removeInspection } = useInspections(id);
