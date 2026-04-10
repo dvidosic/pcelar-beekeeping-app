@@ -1,7 +1,22 @@
 # Pčelar — Development Progress
 
-> **ALL 5 PHASES COMPLETE.** Last updated: 2026-04-09.
+> **ALL 5 PHASES COMPLETE. POST-LAUNCH BUG FIXES DONE.** Last updated: 2026-04-10.
 > This file is the single source of truth for a fresh Claude Code session.
+> Read this entire file before writing any code.
+
+---
+
+## Current App State
+
+**The app is feature-complete, built as a local APK, and sent to the client for first-round testing.**
+
+- ✅ All 5 phases implemented and working
+- ✅ All known bugs fixed (see Bug Fix Log below)
+- ✅ Builds successfully via local Gradle build (`build.ps1`)
+- ✅ APK installed and verified on physical Android device
+- ✅ APK sent to client — awaiting feedback
+
+**Next action: wait for client bug reports, then fix and rebuild.**
 
 ---
 
@@ -17,20 +32,192 @@
 
 ---
 
-## Next Step for a Fresh Session
+## Bug Fix Log (post-launch, 2026-04-10)
 
-**The app is feature-complete.** All that remains is device testing:
+All bugs were found after the first APK build was installed on a physical Android device.
 
-- [ ] Draft restore/discard flow end-to-end on physical Android device
-- [ ] Notification permissions dialog on Android 13+ (first launch)
-- [ ] DateTimePicker two-step flow (date → time dialog) on Android
-- [ ] All tappable elements usable with thick beekeeping gloves (56dp+)
+### Bug 1 — React version mismatch (app crashed on launch)
+- **Error:** `Incompatible React versions: react 19.2.5 vs react-native-renderer 19.1.0`
+- **Fix:** Downgraded `react` and `react-dom` to `19.1.0` in `package.json`. Also added missing `expo-constants` peer dep.
+- **Files:** `package.json`, `package-lock.json`
 
-Post-MVP ideas (not started, not planned in any detail):
-- Export data to CSV
-- Hive statistics/charts screen
-- Multi-user / backup to cloud
-- Queen marking colors by year
+### Bug 2 — Harvest and feeding inserts silently failed
+- **Error:** `NOT NULL constraint failed: honey_harvests.hive_id` (and same for feedings)
+- **Root cause (part A):** `migrations.ts` concatenated all 6 CREATE TABLE statements into one string and passed them to `db.execAsync()` inside `db.withTransactionAsync()`. On Android/Hermes, only the first statement ran reliably — `honey_harvests` and `feedings` tables were never created.
+- **Root cause (part B):** Tab screens (`harvest.tsx`, `feeding.tsx`, `inspections.tsx`, `reminders.tsx`) used `useLocalSearchParams()` to read the `[id]` route param. In Expo Router 6.x, `useLocalSearchParams()` in a **static tab screen** only returns that segment's own params (none). The parent Stack's `[id]` param is only accessible via `useGlobalSearchParams()`. Result: `id` was `undefined` in all four tab screens, so `hive_id` was null on every insert.
+- **Fix A:** Refactored `migrations.ts` to run each CREATE TABLE in a separate `db.execAsync()` call (no `withTransactionAsync` around DDL). Added migration v2 as a repair migration — re-runs all `CREATE TABLE IF NOT EXISTS` statements so existing broken installs get the missing tables without affecting fresh installs.
+- **Fix B:** Replaced `useLocalSearchParams` with `useGlobalSearchParams` in all four tab screens.
+- **Files:** `src/db/migrations.ts`, `app/hives/[id]/harvest.tsx`, `app/hives/[id]/feeding.tsx`, `app/hives/[id]/inspections.tsx`, `app/hives/[id]/reminders.tsx`
+
+### Bug 3 — Keyboard flicker on numeric input in harvest/feeding forms
+- **Error:** Form flickered aggressively when user tapped the confirm tick on Android keyboard in the Količina (kg) field.
+- **Root cause:** `BottomSheet` wraps forms in: `Modal` → `KeyboardAvoidingView` (behavior="height" on Android) → `Animated.View` (spring translateY). When the keyboard hides, `KAV` animates the sheet height back to full size. That resize animation conflicts with the spring `translateY` → flicker. `blurOnSubmit={false}` did not help because `KAV` reacts to the keyboard event directly, not to input blur.
+- **Fix:** In `BottomSheet.tsx`: added `enabled={Platform.OS === 'ios'}` to `KeyboardAvoidingView` (disables it on Android — the ScrollView's `keyboardShouldPersistTaps="handled"` handles taps correctly) and added `hardwareAccelerated` to the `Modal` (GPU rendering eliminates CPU/GPU sync artifacts). Also changed `keyboardType` from `decimal-pad` to `numeric` in both forms.
+- **Files:** `src/components/ui/BottomSheet.tsx`, `src/components/harvest/HarvestForm.tsx`, `src/components/feeding/FeedingForm.tsx`
+
+---
+
+## Build & Development Instructions
+
+### Daily Development (Expo Go via hotspot)
+
+```powershell
+.\start.ps1
+```
+
+- Starts Metro bundler
+- Phone connects via **mobile hotspot** (eduroam/university WiFi blocks direct LAN connection)
+- ngrok tunnel is unreliable — use hotspot instead
+- Scans QR code in Expo Go app on phone
+
+### Client APK Build (local Gradle)
+
+```powershell
+.\build.ps1
+```
+
+- Sets `ANDROID_HOME=D:\Android SDK` and adds `platform-tools` to PATH
+- Runs Gradle release build
+- Installs APK via `adb install` over USB
+- APK output: `android\app\build\outputs\apk\release\app-release.apk`
+
+### TypeScript Check
+
+```bash
+npx tsc --noEmit
+```
+
+### Add a Package
+
+```bash
+# Always use --legacy-peer-deps (react-dom peer dep conflict with Expo 54):
+npm install <package> --legacy-peer-deps
+
+# Or use expo install for SDK-compatible versions:
+npx expo install <package>
+```
+
+---
+
+## Environment Setup
+
+| Item | Value |
+|------|-------|
+| Android SDK | `D:\Android SDK` |
+| Java | 17 (required for Gradle) |
+| adb | Working via USB — phone must be in developer mode |
+| Network | Phone connects via **mobile hotspot** — eduroam blocks direct connection |
+| `ANDROID_HOME` | Set inside `build.ps1` and `start.ps1` — not a global env var |
+
+---
+
+## Known Issues & Workarounds
+
+| Issue | Workaround |
+|-------|-----------|
+| EAS cloud build unreliable | Use `.\build.ps1` (local Gradle) instead |
+| ngrok tunnel unreliable | Use mobile hotspot for Expo Go |
+| Must uninstall old APK before installing new one on client device | Tell client to uninstall first, or use `adb install -r` (replace flag) |
+| `npm install` fails without flag | Always use `--legacy-peer-deps` |
+
+---
+
+## Database
+
+### Migration State
+
+| Migration | Status | Description |
+|-----------|--------|-------------|
+| v1 | Applied on all devices | Creates all 6 tables |
+| v2 | Applied on all devices | Repair migration — re-runs `CREATE TABLE IF NOT EXISTS` for tables that were missing on devices that had the Bug 2A issue |
+
+### All 6 Tables (confirmed working)
+
+```sql
+PRAGMA foreign_keys = ON;  -- set on every DB open in client.ts
+
+schema_version (version INTEGER PRIMARY KEY, applied_at TEXT)
+
+hives (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  location TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL
+)
+
+inspections (
+  id TEXT PRIMARY KEY,
+  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
+  inspected_at TEXT NOT NULL,
+  brood_quantity TEXT CHECK(brood_quantity IN ('low','normal','high')),
+  brood_quality TEXT CHECK(brood_quality IN ('good','spotty','poor')),
+  queen_seen INTEGER NOT NULL DEFAULT 1,
+  queen_age TEXT CHECK(queen_age IN ('under1','one_to_two','over2','unknown')),
+  food_stores TEXT CHECK(food_stores IN ('low','adequate','full')),
+  temperament INTEGER CHECK(temperament BETWEEN 1 AND 5),
+  hygienic_behavior TEXT CHECK(hygienic_behavior IN ('poor','normal','good')),
+  honey_intake_daily_g INTEGER,
+  health_status TEXT CHECK(health_status IN ('healthy','varroa','nosema','other')),
+  treatment_applied INTEGER NOT NULL DEFAULT 0,
+  treatment_substance TEXT,
+  treatment_date TEXT,
+  swarm_event TEXT CHECK(swarm_event IN ('none','natural','artificial')),
+  swarm_destination_hive_id TEXT REFERENCES hives(id),
+  notes TEXT,
+  created_at TEXT NOT NULL
+)
+
+equipment_conditions (
+  id TEXT PRIMARY KEY,
+  inspection_id TEXT NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+  component TEXT NOT NULL,   -- 'floor'|'super1'|'super2'|'super3'|'frames'|'feeder'|'roof'
+  condition TEXT NOT NULL,   -- 'good'|'needs_attention'|'replaced'
+  notes TEXT                 -- reserved, not shown in UI
+)
+
+honey_harvests (
+  id TEXT PRIMARY KEY,
+  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
+  harvested_at TEXT NOT NULL,
+  honey_type TEXT,           -- 'bagremov'|'livadni'|'šumski'|'other'|<custom string>
+  quantity_kg REAL,
+  notes TEXT
+)
+-- Note: no honey_type_custom column — custom types stored directly in honey_type
+
+feedings (
+  id TEXT PRIMARY KEY,
+  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
+  fed_at TEXT NOT NULL,
+  food_type TEXT CHECK(food_type IN ('sugar_syrup','fondant','other')),
+  food_type_custom TEXT,     -- populated when food_type = 'other'
+  quantity_kg REAL,
+  notes TEXT
+)
+
+reminders (
+  id TEXT PRIMARY KEY,
+  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  remind_at TEXT NOT NULL,
+  is_completed INTEGER NOT NULL DEFAULT 0,
+  notification_id TEXT,      -- expo-notifications ID, NULL after completion/delete
+  created_at TEXT NOT NULL
+)
+```
+
+---
+
+## Next Steps
+
+- [ ] Wait for client feedback from first APK test
+- [ ] Fix any bugs reported by client
+- [ ] Rebuild and send updated APK after each fix batch
+- [ ] (Post-MVP, not planned) Export data to CSV
+- [ ] (Post-MVP, not planned) Hive statistics/charts screen
+- [ ] (Post-MVP, not planned) Multi-user / backup to cloud
+- [ ] (Post-MVP, not planned) Queen marking colors by year
 
 ---
 
@@ -51,10 +238,10 @@ beekeeping-app/
 │   │       ├── _layout.tsx  ✅             # Tabs: Pregledi / Vrcanje / Prihranjivanje / Podsjetnici
 │   │       │                               #   headerLeft: back ‹, headerRight: Uredi → /hives/[id]/edit
 │   │       ├── index.tsx    ✅             # Redirect → inspections tab
-│   │       ├── inspections.tsx ✅          # Inspections tab (wired — see below)
-│   │       ├── harvest.tsx  ✅             # Harvest tab (wired — see below)
-│   │       ├── feeding.tsx  ✅             # Feeding tab (wired — see below)
-│   │       ├── reminders.tsx ✅            # Reminders tab (wired — see below)
+│   │       ├── inspections.tsx ✅          # Inspections tab — uses useGlobalSearchParams for [id]
+│   │       ├── harvest.tsx  ✅             # Harvest tab — uses useGlobalSearchParams for [id]
+│   │       ├── feeding.tsx  ✅             # Feeding tab — uses useGlobalSearchParams for [id]
+│   │       ├── reminders.tsx ✅            # Reminders tab — uses useGlobalSearchParams for [id]
 │   │       └── edit.tsx     ✅             # Edit Hive: HiveForm pre-populated + Delete button
 │   └── inspections/
 │       ├── _layout.tsx      ✅             # Stack navigator for inspection screens
@@ -67,7 +254,9 @@ beekeeping-app/
 ├── src/
 │   ├── db/
 │   │   ├── client.ts        ✅             # getDb() SQLite singleton, withTransaction() helper
-│   │   ├── migrations.ts    ✅             # runMigrations(): schema_version table, applies pending migrations
+│   │   ├── migrations.ts    ✅             # runMigrations(): v1 (all tables) + v2 (repair)
+│   │   │                                   #   Each table created in its own execAsync() call
+│   │   │                                   #   No withTransactionAsync around DDL (causes issues on Android)
 │   │   ├── schema/                         # DDL strings (imported by migrations.ts)
 │   │   │   ├── hives.sql.ts
 │   │   │   ├── inspections.sql.ts
@@ -101,7 +290,9 @@ beekeeping-app/
 │   │   │                                    #        inspection_draft__edit__${inspectionId} (edit)
 │   │   │                                    #   TTL: 7 days from savedAt
 │   │   ├── useHarvestLogs.ts        ✅      # harvests[], isLoading, refresh, addHarvest, removeHarvest
+│   │   │                                    #   catch(e) logs actual SQLite error to console
 │   │   ├── useFeedingLogs.ts        ✅      # feedings[], isLoading, refresh, addFeeding, removeFeeding
+│   │   │                                    #   catch(e) logs actual SQLite error to console
 │   │   └── useReminders.ts          ✅      # reminders[], isLoading, refresh
 │   │                                        #   on mount: auto-completes overdue reminders + cancels their notifs
 │   │                                        #   addReminder(description, remindAt): schedules notif, inserts
@@ -131,11 +322,11 @@ beekeeping-app/
 │   │   ├── harvest/
 │   │   │   ├── HarvestCard.tsx      ✅      # Amber stripe, date, honey type label, kg, delete ✕
 │   │   │   └── HarvestForm.tsx      ✅      # date + honey type SegmentedControl + custom TextInput
-│   │   │                                    #   (shown when Ostalo) + kg + notes + Save
+│   │   │                                    #   (shown when Ostalo) + kg (keyboardType="numeric") + notes + Save
 │   │   ├── feeding/
 │   │   │   ├── FeedingCard.tsx      ✅      # Green stripe, date, food type label, kg, delete ✕
 │   │   │   └── FeedingForm.tsx      ✅      # date + food type SegmentedControl + custom TextInput
-│   │   │                                    #   (shown when Ostalo, stored in food_type_custom) + kg + notes
+│   │   │                                    #   (shown when Ostalo, stored in food_type_custom) + kg (keyboardType="numeric") + notes
 │   │   ├── reminders/
 │   │   │   ├── ReminderCard.tsx     ✅      # Amber stripe (pending) or grey (completed), description,
 │   │   │   │                                #   datetime, checkmark button (56dp), delete ✕ (56dp)
@@ -159,7 +350,10 @@ beekeeping-app/
 │   │       ├── Toast.tsx               ✅   # Bottom toast from uiStore.toastQueue, auto-dismiss 3s
 │   │       │                                #   types: 'success' | 'error' | 'info'
 │   │       ├── BottomSheet.tsx         ✅   # Animated Modal slide-up, backdrop dismiss, optional title,
-│   │       │                                #   internal ScrollView, KeyboardAvoidingView
+│   │       │                                #   internal ScrollView, KeyboardAvoidingView (iOS only)
+│   │       │                                #   Modal has hardwareAccelerated + statusBarTranslucent
+│   │       │                                #   KAV disabled on Android (behavior="height" inside Modal
+│   │       │                                #   causes flicker on keyboard hide — ScrollView handles taps)
 │   │       │                                #   prop: snapPoint (fraction of screen height, default 0.6)
 │   │       ├── SectionHeader.tsx       ✅   # Amber uppercase label + horizontal divider line
 │   │       └── ConfirmDialog.tsx       ✅   # showConfirmDialog({title,message,confirmLabel,onConfirm})
@@ -211,87 +405,11 @@ beekeeping-app/
 ├── assets/                                  # App icon, splash screen (amber #F59E0B theme)
 ├── PROGRESS.md              ✅              # This file
 ├── app.json                 ✅              # name="Pčelar", slug="pcelar", Android only, portrait
-├── package.json             ✅              # main="expo-router/entry"
+├── package.json             ✅              # main="expo-router/entry", react+react-dom pinned to 19.1.0
 ├── tsconfig.json            ✅              # @/* → src/* path alias, strict mode
-└── babel.config.js          ✅              # babel-plugin-module-resolver for @/* alias
-```
-
----
-
-## Database Schema (all 6 tables, migration v1)
-
-```sql
-PRAGMA foreign_keys = ON;  -- set on every DB open in client.ts
-
-schema_version (version INTEGER PRIMARY KEY, applied_at TEXT)
-
-hives (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  location TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL
-)
-
-inspections (
-  id TEXT PRIMARY KEY,
-  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
-  inspected_at TEXT NOT NULL,
-  brood_quantity TEXT CHECK(IN 'low','normal','high'),
-  brood_quality TEXT CHECK(IN 'good','spotty','poor'),
-  queen_seen INTEGER NOT NULL DEFAULT 1,       -- 0|1
-  queen_age TEXT CHECK(IN 'under1','one_to_two','over2','unknown'),
-  food_stores TEXT CHECK(IN 'low','adequate','full'),
-  temperament INTEGER CHECK(BETWEEN 1 AND 5),
-  hygienic_behavior TEXT CHECK(IN 'poor','normal','good'),
-  honey_intake_daily_g INTEGER,
-  health_status TEXT CHECK(IN 'healthy','varroa','nosema','other'),
-  treatment_applied INTEGER NOT NULL DEFAULT 0, -- 0|1
-  treatment_substance TEXT,
-  treatment_date TEXT,
-  swarm_event TEXT CHECK(IN 'none','natural','artificial'),
-  swarm_destination_hive_id TEXT REFERENCES hives(id),
-  notes TEXT,
-  created_at TEXT NOT NULL
-)
-
-equipment_conditions (
-  id TEXT PRIMARY KEY,
-  inspection_id TEXT NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
-  component TEXT NOT NULL,   -- 'floor'|'super1'|'super2'|'super3'|'frames'|'feeder'|'roof'
-  condition TEXT NOT NULL,   -- 'good'|'needs_attention'|'replaced'
-  notes TEXT                 -- reserved, not shown in UI
-)
-
-honey_harvests (
-  id TEXT PRIMARY KEY,
-  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
-  harvested_at TEXT NOT NULL,
-  honey_type TEXT,           -- 'bagremov'|'livadni'|'šumski'|'other'|<custom string>
-  quantity_kg REAL,
-  notes TEXT
-)
--- Note: no honey_type_custom column — custom types stored directly in honey_type
-
-feedings (
-  id TEXT PRIMARY KEY,
-  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
-  fed_at TEXT NOT NULL,
-  food_type TEXT CHECK(IN 'sugar_syrup','fondant','other'),
-  food_type_custom TEXT,     -- populated when food_type = 'other'
-  quantity_kg REAL,
-  notes TEXT
-)
-
-reminders (
-  id TEXT PRIMARY KEY,
-  hive_id TEXT NOT NULL REFERENCES hives(id) ON DELETE CASCADE,
-  description TEXT NOT NULL,
-  remind_at TEXT NOT NULL,
-  is_completed INTEGER NOT NULL DEFAULT 0,  -- 0|1
-  notification_id TEXT,      -- expo-notifications ID, NULL after completion/delete
-  created_at TEXT NOT NULL
-)
+├── babel.config.js          ✅              # babel-plugin-module-resolver for @/* alias
+├── start.ps1                ✅              # Dev script: sets env vars, runs npx expo start
+└── build.ps1                ✅              # Release build: sets ANDROID_HOME, runs Gradle, adb install
 ```
 
 ---
@@ -309,6 +427,8 @@ reminders (
 | D7 | Swarm destination: tappable hive name list, never a Picker/dropdown | Glove-friendly UX rule |
 | D8 | All interactive elements: **minimum 56dp height** (not 48dp) | Glove-friendly UX rule |
 | D9 | Harvest custom type stored directly in `honey_type` column | Schema has no separate custom column; display falls back to raw string |
+| D10 | Local Gradle build (`build.ps1`) instead of EAS cloud | EAS cloud build unreliable; local build gives full control |
+| D11 | Mobile hotspot for Expo Go dev, not LAN or ngrok | eduroam blocks LAN connections; ngrok is unreliable |
 
 ---
 
@@ -351,6 +471,10 @@ This app is used outdoors with beekeeping gloves. **NON-NEGOTIABLE:**
 10. **expo-notifications trigger on Android** requires `channelId: 'reminders'` explicitly in the trigger object — the channel is created in `app/_layout.tsx` on first boot.
 11. **Inspection + equipment are written in a single transaction** — `useInspections.addInspection` and `editInspection` both use `withTransaction` to atomically write both tables. Equipment rows are always deleted and re-inserted on edit.
 12. **`useReminders` stale cleanup on mount** — on every mount of the Reminders tab, overdue incomplete reminders are auto-completed and their OS notifications cancelled. This is intentional.
+13. **Tab screens must use `useGlobalSearchParams`** — `useLocalSearchParams` in a static tab screen (harvest, feeding, inspections, reminders) does NOT include the parent Stack's `[id]` param in Expo Router 6.x. Always use `useGlobalSearchParams` in `app/hives/[id]/*.tsx` tab screens.
+14. **DDL in migrations must use individual `execAsync` calls** — do NOT concatenate multiple CREATE TABLE statements into one string for `execAsync`. On Android/Hermes, only the first statement reliably executes. Each table gets its own `await db.execAsync(createXxxTable)` call.
+15. **`KeyboardAvoidingView` disabled on Android in BottomSheet** — KAV with `behavior="height"` inside a Modal causes layout flicker on keyboard hide. It is intentionally disabled on Android (`enabled={Platform.OS === 'ios'}`). Do not re-enable it.
+16. **`react` and `react-dom` pinned to `19.1.0`** — must match `react-native-renderer` version bundled with react-native 0.81.5. Do not upgrade these independently.
 
 ---
 
@@ -359,15 +483,16 @@ This app is used outdoors with beekeeping gloves. **NON-NEGOTIABLE:**
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `expo` | ~54.0.33 | Core Expo SDK 54 |
-| `expo-router` | ~6.0.23 | File-based routing (v3 API — `Stack`, `Tabs`, `useLocalSearchParams`, `router`) |
+| `expo-router` | ~6.0.23 | File-based routing (v3 API — `Stack`, `Tabs`, `useGlobalSearchParams`, `router`) |
 | `expo-sqlite` | ~16.0.10 | Local SQLite database, new async API |
 | `expo-crypto` | ~15.0.8 | `randomUUID()` for UUID generation |
 | `expo-notifications` | ~0.32.16 | Local push notifications (schedule, cancel, tap listener) |
+| `expo-constants` | ~18.0.13 | Required peer dep of expo-router |
 | `expo-status-bar` | ~3.0.9 | Android status bar styling |
 | `babel-preset-expo` | ~54.0.10 | Babel preset required by Expo |
 | `react-native` | 0.81.5 | Core React Native framework |
-| `react` | ^19.2.5 | React |
-| `react-dom` | ^19.2.5 | Required by Expo 54 as peer dep (causes `--legacy-peer-deps` requirement) |
+| `react` | 19.1.0 | React — **pinned**, must match react-native-renderer |
+| `react-dom` | 19.1.0 | Required by Expo 54 as peer dep — **pinned**, must match react |
 | `@react-native-async-storage/async-storage` | 2.2.0 | Inspection draft persistence (AsyncStorage) |
 | `@react-native-community/datetimepicker` | 8.4.4 | Native date/time picker dialogs on Android |
 | `react-native-safe-area-context` | ~5.6.0 | Safe area insets (notches, nav bars) |
@@ -377,29 +502,3 @@ This app is used outdoors with beekeeping gloves. **NON-NEGOTIABLE:**
 | `babel-plugin-module-resolver` | ^5.0.3 | (dev) `@/*` path alias in Babel |
 | `typescript` | ~5.9.2 | (dev) TypeScript compiler |
 | `@types/react` | ~19.1.0 | (dev) React type definitions |
-
----
-
-## How to Run
-
-```bash
-cd "D:\Coding Projects\beekeeping-app"
-npx expo start --android
-```
-
-## TypeScript Check
-
-```bash
-cd "D:\Coding Projects\beekeeping-app"
-npx tsc --noEmit
-```
-
-## Add a Package
-
-```bash
-# Use --legacy-peer-deps for npm (react-dom peer dep conflict):
-npm install <package> --legacy-peer-deps
-
-# Or use expo install for SDK-compatible versions:
-npx expo install <package>
-```
