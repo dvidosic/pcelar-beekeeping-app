@@ -9,20 +9,32 @@ import { getDb } from './client';
 
 interface Migration {
   version: number;
-  sql: string;
+  sqls: string[];
 }
 
 const migrations: Migration[] = [
   {
     version: 1,
-    sql: `
-      ${createHivesTable}
-      ${createInspectionsTable}
-      ${createEquipmentConditionsTable}
-      ${createHoneyHarvestsTable}
-      ${createFeedingsTable}
-      ${createRemindersTable}
-    `,
+    sqls: [
+      createHivesTable,
+      createInspectionsTable,
+      createEquipmentConditionsTable,
+      createHoneyHarvestsTable,
+      createFeedingsTable,
+      createRemindersTable,
+    ],
+  },
+  {
+    version: 2,
+    // Repair migration: creates any tables not created by v1 on affected devices.
+    // Safe on all installs — every statement uses CREATE TABLE IF NOT EXISTS.
+    sqls: [
+      createInspectionsTable,
+      createEquipmentConditionsTable,
+      createHoneyHarvestsTable,
+      createFeedingsTable,
+      createRemindersTable,
+    ],
   },
 ];
 
@@ -46,12 +58,12 @@ export async function runMigrations(): Promise<void> {
   const pending = migrations.filter((m) => m.version > currentVersion);
 
   for (const migration of pending) {
-    await db.withTransactionAsync(async () => {
-      await db.execAsync(migration.sql);
-      await db.runAsync(
-        'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-        [migration.version, new Date().toISOString()]
-      );
-    });
+    for (const sql of migration.sqls) {
+      await db.execAsync(sql);
+    }
+    await db.runAsync(
+      'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
+      [migration.version, new Date().toISOString()]
+    );
   }
 }

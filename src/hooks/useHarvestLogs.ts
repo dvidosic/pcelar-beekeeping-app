@@ -37,7 +37,8 @@ export function useHarvestLogs(hiveId: string) {
       try {
         await insertHarvest(harvest);
         await refresh();
-      } catch {
+      } catch (e) {
+        console.error('[useHarvestLogs] addHarvest failed:', e);
         showToast(L.greška, 'error');
         throw new Error('insert failed');
       }

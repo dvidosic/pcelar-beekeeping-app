@@ -36,7 +36,8 @@ export function useFeedingLogs(hiveId: string) {
       try {
         await insertFeeding(feeding);
         await refresh();
-      } catch {
+      } catch (e) {
+        console.error('[useFeedingLogs] addFeeding failed:', e);
         showToast(L.greška, 'error');
         throw new Error('insert failed');
       }
