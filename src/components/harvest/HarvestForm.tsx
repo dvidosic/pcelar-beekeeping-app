@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Keyboard,
   StyleSheet,
 } from 'react-native';
 import { DateTimePickerField } from '@/components/ui/DateTimePickerField';
@@ -85,6 +86,8 @@ export function HarvestForm({ hiveId, onSubmit }: HarvestFormProps) {
           placeholderTextColor={colors.disabledText}
           keyboardType="decimal-pad"
           returnKeyType="done"
+          blurOnSubmit={false}
+          onSubmitEditing={() => Keyboard.dismiss()}
         />
       </FormField>
 
