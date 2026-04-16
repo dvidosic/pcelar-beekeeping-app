@@ -12,6 +12,7 @@ import { showConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 import { useReminders } from '@/hooks/useReminders';
 import { Reminder } from '@/types/reminder';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { L } from '@/constants/labels';
@@ -43,6 +44,7 @@ export default function RemindersTab() {
   );
 
   return (
+    <ErrorBoundary>
     <View style={styles.container}>
       <FlatList
         data={reminders}
@@ -86,6 +88,7 @@ export default function RemindersTab() {
         <ReminderForm onSubmit={handleSubmit} />
       </BottomSheet>
     </View>
+    </ErrorBoundary>
   );
 }
 

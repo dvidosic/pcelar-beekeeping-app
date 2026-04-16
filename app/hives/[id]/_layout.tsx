@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tabs, useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { L } from '@/constants/labels';
@@ -12,6 +13,7 @@ export default function HiveDetailLayout() {
   const hive = useHiveStore((s) => s.hives.find((h) => h.id === id));
 
   return (
+    <ErrorBoundary>
     <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
@@ -81,6 +83,7 @@ export default function HiveDetailLayout() {
       <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen name="edit" options={{ href: null }} />
     </Tabs>
+    </ErrorBoundary>
   );
 }
 

@@ -15,6 +15,7 @@ export default function HivesLayout() {
     >
       <Stack.Screen name="index" options={{ title: L.košnice }} />
       <Stack.Screen name="add" options={{ title: L.dodajKošnicu, presentation: 'modal' }} />
+      <Stack.Screen name="settings" options={{ title: L.postavke }} />
       <Stack.Screen name="[id]" options={{ headerShown: false }} />
     </Stack>
   );

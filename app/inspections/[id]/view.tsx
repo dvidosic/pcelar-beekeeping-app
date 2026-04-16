@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useEquipmentConditions } from '@/hooks/useEquipmentConditions';
 import { useTreatmentDates } from '@/hooks/useTreatmentDates';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { getInspectionById } from '@/db/repositories/inspectionRepository';
 import { Inspection, HealthStatus, EquipmentConditionValue } from '@/types/inspection';
 import {
@@ -114,6 +115,7 @@ export default function InspectionDetailScreen() {
       : '—';
 
   return (
+    <ErrorBoundary>
     <>
       <Stack.Screen
         options={{
@@ -231,6 +233,7 @@ export default function InspectionDetailScreen() {
         ) : null}
       </ScrollView>
     </>
+    </ErrorBoundary>
   );
 }
 

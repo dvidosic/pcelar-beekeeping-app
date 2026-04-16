@@ -12,6 +12,7 @@ import { showConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 import { useFeedingLogs } from '@/hooks/useFeedingLogs';
 import { Feeding } from '@/types/feeding';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { L } from '@/constants/labels';
@@ -42,12 +43,11 @@ export default function FeedingTab() {
   );
 
   return (
+    <ErrorBoundary>
     <View style={styles.container}>
-      <Image
-        source={require('../../../assets/app-logo.png')}
-        style={styles.watermark}
-        pointerEvents="none"
-      />
+      <View pointerEvents="none" style={styles.watermarkContainer}>
+        <Image source={require('../../../assets/app-logo.png')} style={styles.watermarkImage} />
+      </View>
       <FlatList
         data={feedings}
         keyExtractor={(item) => item.id}
@@ -86,6 +86,7 @@ export default function FeedingTab() {
         <FeedingForm hiveId={id} onSubmit={handleSubmit} />
       </BottomSheet>
     </View>
+    </ErrorBoundary>
   );
 }
 
@@ -97,14 +98,17 @@ const styles = StyleSheet.create({
   list: {
     paddingTop: spacing.md,
   },
-  watermark: {
+  watermarkContainer: {
     position: 'absolute',
-    opacity: 0.07,
     width: '70%',
-    height: undefined,
     aspectRatio: 1,
-    resizeMode: 'contain',
     alignSelf: 'center',
     top: '30%',
+  },
+  watermarkImage: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.07,
+    resizeMode: 'contain',
   },
 });

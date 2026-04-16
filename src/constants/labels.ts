@@ -172,6 +172,16 @@ export const L = {
   unesiteGrame: 'npr. 500',
   unesiteNaziv: 'npr. Livadna',
   unesiteOpis: 'Opis podsjetnika...',
+
+  // Settings & Export
+  postavke: 'Postavke',
+  izvozPodataka: 'Izvoz podataka',
+  izvozUspjesan: 'Podaci su uspješno izvezeni',
+  izvozGreska: 'Greška pri izvozu podataka',
+
+  // Error boundary
+  greskaNaEkranu: 'Došlo je do greške na ovom ekranu.',
+  pokusajPonovo: 'Pokušaj ponovo',
 } as const;
 
 export type LabelKey = keyof typeof L;

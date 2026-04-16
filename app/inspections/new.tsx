@@ -27,6 +27,7 @@ import { showConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useInspections } from '@/hooks/useInspections';
 import { useInspectionDraft } from '@/hooks/useInspectionDraft';
 import { useHiveStore } from '@/stores/hiveStore';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 import {
   broodQuantityOptions,
@@ -279,6 +280,7 @@ export default function NewInspectionScreen() {
   const otherHives = hives.filter((h) => h.id !== hiveId);
 
   return (
+    <ErrorBoundary>
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -520,6 +522,7 @@ export default function NewInspectionScreen() {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    </ErrorBoundary>
   );
 }
 

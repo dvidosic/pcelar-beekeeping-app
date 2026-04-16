@@ -47,11 +47,9 @@ export default function InspectionsTab() {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../../../assets/app-logo.png')}
-        style={styles.watermark}
-        pointerEvents="none"
-      />
+      <View pointerEvents="none" style={styles.watermarkContainer}>
+        <Image source={require('../../../assets/app-logo.png')} style={styles.watermarkImage} />
+      </View>
       <InspectionSummaryBar
         inspection={lastInspection}
         onPress={() => lastInspection && router.push(`/inspections/${lastInspection.id}/view`)}
@@ -99,14 +97,17 @@ const styles = StyleSheet.create({
   list: {
     paddingTop: spacing.md,
   },
-  watermark: {
+  watermarkContainer: {
     position: 'absolute',
-    opacity: 0.07,
     width: '70%',
-    height: undefined,
     aspectRatio: 1,
-    resizeMode: 'contain',
     alignSelf: 'center',
     top: '30%',
+  },
+  watermarkImage: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.07,
+    resizeMode: 'contain',
   },
 });
