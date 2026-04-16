@@ -45,3 +45,6 @@ android/app/build/
 
 # Claude Code context file
 PROGRESS.md
+
+# Claude Code
+.claude/
