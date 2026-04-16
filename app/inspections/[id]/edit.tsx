@@ -14,6 +14,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { NumericStepper } from '@/components/ui/NumericStepper';
 import { BooleanButtonField } from '@/components/ui/BooleanButtonField';
 import { TemperamentPicker } from '@/components/ui/TemperamentPicker';
 import { DateTimePickerField } from '@/components/ui/DateTimePickerField';
@@ -25,6 +26,7 @@ import { showConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 import { useInspections } from '@/hooks/useInspections';
 import { useInspectionDraft } from '@/hooks/useInspectionDraft';
+import { useTreatmentDates } from '@/hooks/useTreatmentDates';
 import { useHiveStore } from '@/stores/hiveStore';
 import { getInspectionById } from '@/db/repositories/inspectionRepository';
 import { getByInspectionId } from '@/db/repositories/equipmentRepository';
@@ -67,18 +69,21 @@ interface FormState {
   inspectedAt: Date;
   broodQuantity: BroodQuantity;
   broodQuality: BroodQuality;
+  broodFrames: number | null;
   queenSeen: boolean;
   queenAge: QueenAge;
   foodStores: FoodStores;
+  foodStoresKg: number | null;
   temperament: number;
   hygienicBehavior: HygienicBehavior;
   honeyIntakeG: string;
   healthStatus: HealthStatus;
   treatmentApplied: boolean;
   treatmentSubstance: string;
-  treatmentDate: Date;
+  treatmentDates: string[];
   swarmEvent: SwarmEvent;
   swarmDestinationHiveId: string;
+  swarmText: string;
   notes: string;
   equipment: EquipmentConditionMap;
 }
@@ -88,18 +93,21 @@ function inspectionToForm(inspection: Inspection, equipment: EquipmentConditionM
     inspectedAt: new Date(inspection.inspected_at),
     broodQuantity: (inspection.brood_quantity ?? 'normal') as BroodQuantity,
     broodQuality: (inspection.brood_quality ?? 'good') as BroodQuality,
+    broodFrames: inspection.brood_frames,
     queenSeen: inspection.queen_seen === 1,
     queenAge: (inspection.queen_age ?? 'unknown') as QueenAge,
     foodStores: (inspection.food_stores ?? 'adequate') as FoodStores,
+    foodStoresKg: inspection.food_stores_kg,
     temperament: inspection.temperament ?? 3,
     hygienicBehavior: (inspection.hygienic_behavior ?? 'normal') as HygienicBehavior,
     honeyIntakeG: inspection.honey_intake_daily_g != null ? String(inspection.honey_intake_daily_g) : '',
     healthStatus: (inspection.health_status ?? 'healthy') as HealthStatus,
     treatmentApplied: inspection.treatment_applied === 1,
     treatmentSubstance: inspection.treatment_substance ?? '',
-    treatmentDate: inspection.treatment_date ? new Date(inspection.treatment_date) : new Date(),
+    treatmentDates: [],
     swarmEvent: (inspection.swarm_event ?? 'none') as SwarmEvent,
     swarmDestinationHiveId: inspection.swarm_destination_hive_id ?? '',
+    swarmText: inspection.swarm_new_hive_note ?? '',
     notes: inspection.notes ?? '',
     equipment,
   };
@@ -110,18 +118,21 @@ function formToDraft(f: FormState): InspectionDraft {
     inspectedAt: f.inspectedAt.toISOString(),
     broodQuantity: f.broodQuantity,
     broodQuality: f.broodQuality,
+    broodFrames: f.broodFrames,
     queenSeen: f.queenSeen,
     queenAge: f.queenAge,
     foodStores: f.foodStores,
+    foodStoresKg: f.foodStoresKg,
     temperament: f.temperament,
     hygienicBehavior: f.hygienicBehavior,
     honeyIntakeDailyG: f.honeyIntakeG,
     healthStatus: f.healthStatus,
     treatmentApplied: f.treatmentApplied,
     treatmentSubstance: f.treatmentSubstance,
-    treatmentDate: f.treatmentDate.toISOString(),
+    treatmentDates: f.treatmentDates,
     swarmEvent: f.swarmEvent,
     swarmDestinationHiveId: f.swarmDestinationHiveId,
+    swarmText: f.swarmText,
     notes: f.notes,
     equipmentConditions: f.equipment,
     savedAt: new Date().toISOString(),
@@ -133,18 +144,21 @@ function draftToForm(d: InspectionDraft): FormState {
     inspectedAt: new Date(d.inspectedAt),
     broodQuantity: d.broodQuantity,
     broodQuality: d.broodQuality,
+    broodFrames: d.broodFrames,
     queenSeen: d.queenSeen,
     queenAge: d.queenAge,
     foodStores: d.foodStores,
+    foodStoresKg: d.foodStoresKg,
     temperament: d.temperament,
     hygienicBehavior: d.hygienicBehavior,
     honeyIntakeG: d.honeyIntakeDailyG,
     healthStatus: d.healthStatus,
     treatmentApplied: d.treatmentApplied,
     treatmentSubstance: d.treatmentSubstance,
-    treatmentDate: new Date(d.treatmentDate),
+    treatmentDates: d.treatmentDates,
     swarmEvent: d.swarmEvent,
     swarmDestinationHiveId: d.swarmDestinationHiveId,
+    swarmText: d.swarmText,
     notes: d.notes,
     equipment: d.equipmentConditions,
   };
@@ -164,6 +178,8 @@ export default function EditInspectionScreen() {
   const [isDirty, setIsDirty] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const draftCleared = useRef(false);
+
+  const { dates: loadedTreatmentDates } = useTreatmentDates(id ?? null);
 
   // Load initial data from DB, then check for draft
   useEffect(() => {
@@ -185,6 +201,13 @@ export default function EditInspectionScreen() {
     }
     load();
   }, [id]);
+
+  // Sync loaded treatment dates into form (only when not dirty, so draft takes precedence)
+  useEffect(() => {
+    if (loadedTreatmentDates.length > 0 && !isDirty) {
+      setForm((prev) => (prev ? { ...prev, treatmentDates: loadedTreatmentDates } : prev));
+    }
+  }, [loadedTreatmentDates, isDirty]);
 
   // Auto-save draft on form changes
   useEffect(() => {
@@ -247,24 +270,28 @@ export default function EditInspectionScreen() {
           inspected_at: form.inspectedAt.toISOString(),
           brood_quantity: form.broodQuantity,
           brood_quality: form.broodQuality,
+          brood_frames: form.broodFrames,
           queen_seen: form.queenSeen ? 1 : 0,
           queen_age: form.queenAge,
           food_stores: form.foodStores,
+          food_stores_kg: form.foodStoresKg,
           temperament: form.temperament,
           hygienic_behavior: form.hygienicBehavior,
           honey_intake_daily_g: form.honeyIntakeG ? parseInt(form.honeyIntakeG, 10) : null,
           health_status: form.healthStatus,
           treatment_applied: form.treatmentApplied ? 1 : 0,
           treatment_substance: form.treatmentApplied ? form.treatmentSubstance || null : null,
-          treatment_date: form.treatmentApplied ? form.treatmentDate.toISOString() : null,
+          treatment_date: null,
           swarm_event: form.swarmEvent,
           swarm_destination_hive_id:
-            form.swarmEvent !== 'none' && form.swarmDestinationHiveId
+            (form.swarmEvent === 'natural' || form.swarmEvent === 'artificial') && form.swarmDestinationHiveId
               ? form.swarmDestinationHiveId
               : null,
+          swarm_new_hive_note: form.swarmEvent === 'razrojena' ? form.swarmText || null : null,
           notes: form.notes || null,
         },
-        form.equipment
+        form.equipment,
+        form.treatmentDates
       );
       await clearDraft();
       draftCleared.current = true;
@@ -330,6 +357,15 @@ export default function EditInspectionScreen() {
             onChange={(v) => set('broodQuantity', v as BroodQuantity)}
           />
         </FormField>
+        <FormField label={L.brojOkvirasLeglom}>
+          <NumericStepper
+            label={L.brojOkvirasLeglom}
+            value={form.broodFrames}
+            onChange={(v) => set('broodFrames', v)}
+            min={1}
+            max={20}
+          />
+        </FormField>
         <FormField label={L.kvalitetaLegla}>
           <SegmentedControl
             options={broodQualityOptions}
@@ -362,6 +398,15 @@ export default function EditInspectionScreen() {
             options={foodStoresOptions}
             value={form.foodStores}
             onChange={(v) => set('foodStores', v as FoodStores)}
+          />
+        </FormField>
+        <FormField label={L.kolicanaHrane}>
+          <NumericStepper
+            label={L.kolicanaHrane}
+            value={form.foodStoresKg}
+            onChange={(v) => set('foodStoresKg', v)}
+            min={1}
+            max={20}
           />
         </FormField>
 
@@ -401,6 +446,7 @@ export default function EditInspectionScreen() {
             options={healthStatusOptions}
             value={form.healthStatus}
             onChange={(v) => set('healthStatus', v as HealthStatus)}
+            wrap
           />
         </FormField>
 
@@ -409,7 +455,10 @@ export default function EditInspectionScreen() {
         <BooleanButtonField
           label={L.tretmanProveden}
           value={form.treatmentApplied}
-          onChange={(v) => set('treatmentApplied', v)}
+          onChange={(v) => {
+            setForm((prev) => prev ? { ...prev, treatmentApplied: v, treatmentDates: v ? prev.treatmentDates : [] } : prev);
+            setIsDirty(true);
+          }}
           trueLabel={L.da}
           falseLabel={L.ne}
         />
@@ -417,8 +466,8 @@ export default function EditInspectionScreen() {
           <TreatmentFields
             substance={form.treatmentSubstance}
             onSubstanceChange={(v) => set('treatmentSubstance', v)}
-            treatmentDate={form.treatmentDate}
-            onTreatmentDateChange={(d) => set('treatmentDate', d)}
+            treatmentDates={form.treatmentDates}
+            onTreatmentDatesChange={(dates) => set('treatmentDates', dates)}
           />
         )}
 
@@ -431,7 +480,7 @@ export default function EditInspectionScreen() {
             onChange={(v) => set('swarmEvent', v as SwarmEvent)}
           />
         </FormField>
-        {form.swarmEvent !== 'none' && (
+        {(form.swarmEvent === 'natural' || form.swarmEvent === 'artificial') && (
           <FormField label={L.odredišnaKošnica}>
             {otherHives.length === 0 ? (
               <Text style={styles.noHivesText}>{L.nePostojeKošnice}</Text>
@@ -454,6 +503,18 @@ export default function EditInspectionScreen() {
                 })}
               </View>
             )}
+          </FormField>
+        )}
+        {form.swarmEvent === 'razrojena' && (
+          <FormField label={L.uKojuKosnicu}>
+            <TextInput
+              style={styles.input}
+              value={form.swarmText}
+              onChangeText={(v) => set('swarmText', v)}
+              placeholder={L.novaKosnica}
+              placeholderTextColor={colors.disabledText}
+              returnKeyType="done"
+            />
           </FormField>
         )}
 

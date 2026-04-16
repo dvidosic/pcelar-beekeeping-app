@@ -14,6 +14,7 @@ interface SegmentedControlProps<T extends string = string> {
   onChange: (value: T) => void;
   disabled?: boolean;
   style?: ViewStyle;
+  wrap?: boolean;
 }
 
 export function SegmentedControl<T extends string = string>({
@@ -22,9 +23,10 @@ export function SegmentedControl<T extends string = string>({
   onChange,
   disabled,
   style,
+  wrap,
 }: SegmentedControlProps<T>) {
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, wrap && styles.containerWrap, style]}>
       {options.map((opt, index) => {
         const selected = opt.value === value;
         const isFirst = index === 0;
@@ -34,6 +36,7 @@ export function SegmentedControl<T extends string = string>({
             key={opt.value}
             style={[
               styles.segment,
+              wrap && styles.segmentWrap,
               selected ? styles.selected : styles.unselected,
               isFirst && styles.firstSegment,
               isLast && styles.lastSegment,
@@ -70,6 +73,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
   },
+  containerWrap: {
+    flexWrap: 'wrap',
+  },
   segment: {
     flex: 1,
     minHeight: 56,
@@ -83,6 +89,10 @@ const styles = StyleSheet.create({
   },
   unselected: {
     backgroundColor: colors.white,
+  },
+  segmentWrap: {
+    flex: 0,
+    width: '33.33%',
   },
   firstSegment: {
     // outer radius already on container

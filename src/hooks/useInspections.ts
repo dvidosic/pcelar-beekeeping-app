@@ -10,6 +10,10 @@ import {
   insertMany as insertEquipmentMany,
   deleteByInspectionId,
 } from '@/db/repositories/equipmentRepository';
+import {
+  insertTreatmentDates,
+  deleteTreatmentDates,
+} from '@/db/repositories/treatmentDatesRepository';
 import { Inspection, EquipmentConditionMap, EquipmentCondition } from '@/types/inspection';
 import { EquipmentComponentKey, equipmentComponents } from '@/constants/options';
 import { generateUUID } from '@/utils/uuid';
@@ -54,7 +58,8 @@ export function useInspections(hiveId: string) {
   const addInspection = useCallback(
     async (
       data: Omit<Inspection, 'id' | 'created_at'>,
-      equipmentMap: EquipmentConditionMap
+      equipmentMap: EquipmentConditionMap,
+      treatmentDates: string[]
     ): Promise<string> => {
       const id = generateUUID();
       const inspection: Inspection = { ...data, id, created_at: nowISO() };
@@ -63,6 +68,7 @@ export function useInspections(hiveId: string) {
       await withTransaction(async (db) => {
         await insertInspection(inspection);
         await insertEquipmentMany(equipmentRows);
+        await insertTreatmentDates(id, treatmentDates);
       });
 
       await refresh();
@@ -75,7 +81,8 @@ export function useInspections(hiveId: string) {
     async (
       id: string,
       data: Omit<Inspection, 'id' | 'hive_id' | 'created_at'>,
-      equipmentMap: EquipmentConditionMap
+      equipmentMap: EquipmentConditionMap,
+      treatmentDates: string[]
     ) => {
       const equipmentRows = buildEquipmentRows(id, equipmentMap);
 
@@ -83,6 +90,8 @@ export function useInspections(hiveId: string) {
         await updateInspection(id, data);
         await deleteByInspectionId(id);
         await insertEquipmentMany(equipmentRows);
+        await deleteTreatmentDates(id);
+        await insertTreatmentDates(id, treatmentDates);
       });
 
       await refresh();

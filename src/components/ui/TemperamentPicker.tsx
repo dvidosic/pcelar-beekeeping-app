@@ -5,11 +5,11 @@ import { spacing, radius } from '@/constants/spacing';
 import { L } from '@/constants/labels';
 
 const LEVELS = [
-  { value: 1, emoji: '😌' },
-  { value: 2, emoji: '🙂' },
+  { value: 1, emoji: '😡' },
+  { value: 2, emoji: '😠' },
   { value: 3, emoji: '😐' },
-  { value: 4, emoji: '😠' },
-  { value: 5, emoji: '😡' },
+  { value: 4, emoji: '🙂' },
+  { value: 5, emoji: '😌' },
 ];
 
 interface TemperamentPickerProps {
@@ -22,8 +22,8 @@ export function TemperamentPicker({ value, onChange, disabled }: TemperamentPick
   return (
     <View style={styles.wrapper}>
       <View style={styles.endLabels}>
-        <Text style={styles.endLabel}>{L.vrlaMirna}</Text>
         <Text style={styles.endLabel}>{L.vrloAgresivna}</Text>
+        <Text style={styles.endLabel}>{L.vrlaMirna}</Text>
       </View>
       <View style={styles.row}>
         {LEVELS.map((level, index) => {

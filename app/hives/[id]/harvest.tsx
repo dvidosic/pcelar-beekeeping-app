@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
+import { View, FlatList, Image, StyleSheet } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -43,6 +43,11 @@ export default function HarvestTab() {
 
   return (
     <View style={styles.container}>
+      <Image
+        source={require('../../../assets/app-logo.png')}
+        style={styles.watermark}
+        pointerEvents="none"
+      />
       <FlatList
         data={harvests}
         keyExtractor={(item) => item.id}
@@ -91,5 +96,15 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingTop: spacing.md,
+  },
+  watermark: {
+    position: 'absolute',
+    opacity: 0.07,
+    width: '70%',
+    height: undefined,
+    aspectRatio: 1,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    top: '30%',
   },
 });

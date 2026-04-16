@@ -14,6 +14,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { NumericStepper } from '@/components/ui/NumericStepper';
 import { BooleanButtonField } from '@/components/ui/BooleanButtonField';
 import { TemperamentPicker } from '@/components/ui/TemperamentPicker';
 import { DateTimePickerField } from '@/components/ui/DateTimePickerField';
@@ -40,8 +41,6 @@ import {
 import { colors } from '@/constants/colors';
 import { spacing, radius } from '@/constants/spacing';
 import { L } from '@/constants/labels';
-import { nowISO } from '@/utils/dateUtils';
-import { generateUUID } from '@/utils/uuid';
 
 import {
   BroodQuantity,
@@ -65,18 +64,21 @@ interface FormState {
   inspectedAt: Date;
   broodQuantity: BroodQuantity;
   broodQuality: BroodQuality;
+  broodFrames: number | null;
   queenSeen: boolean;
   queenAge: QueenAge;
   foodStores: FoodStores;
+  foodStoresKg: number | null;
   temperament: number;
   hygienicBehavior: HygienicBehavior;
   honeyIntakeG: string;
   healthStatus: HealthStatus;
   treatmentApplied: boolean;
   treatmentSubstance: string;
-  treatmentDate: Date;
+  treatmentDates: string[];
   swarmEvent: SwarmEvent;
   swarmDestinationHiveId: string;
+  swarmText: string;
   notes: string;
   equipment: EquipmentConditionMap;
 }
@@ -85,18 +87,21 @@ const defaultState = (): FormState => ({
   inspectedAt: new Date(),
   broodQuantity: 'normal',
   broodQuality: 'good',
+  broodFrames: null,
   queenSeen: true,
   queenAge: 'unknown',
   foodStores: 'adequate',
+  foodStoresKg: null,
   temperament: 3,
   hygienicBehavior: 'normal',
   honeyIntakeG: '',
   healthStatus: 'healthy',
   treatmentApplied: false,
   treatmentSubstance: '',
-  treatmentDate: new Date(),
+  treatmentDates: [],
   swarmEvent: 'none',
   swarmDestinationHiveId: '',
+  swarmText: '',
   notes: '',
   equipment: DEFAULT_EQUIPMENT,
 });
@@ -106,18 +111,21 @@ function formToDraft(f: FormState): InspectionDraft {
     inspectedAt: f.inspectedAt.toISOString(),
     broodQuantity: f.broodQuantity,
     broodQuality: f.broodQuality,
+    broodFrames: f.broodFrames,
     queenSeen: f.queenSeen,
     queenAge: f.queenAge,
     foodStores: f.foodStores,
+    foodStoresKg: f.foodStoresKg,
     temperament: f.temperament,
     hygienicBehavior: f.hygienicBehavior,
     honeyIntakeDailyG: f.honeyIntakeG,
     healthStatus: f.healthStatus,
     treatmentApplied: f.treatmentApplied,
     treatmentSubstance: f.treatmentSubstance,
-    treatmentDate: f.treatmentDate.toISOString(),
+    treatmentDates: f.treatmentDates,
     swarmEvent: f.swarmEvent,
     swarmDestinationHiveId: f.swarmDestinationHiveId,
+    swarmText: f.swarmText,
     notes: f.notes,
     equipmentConditions: f.equipment,
     savedAt: new Date().toISOString(),
@@ -129,18 +137,21 @@ function draftToForm(d: InspectionDraft): FormState {
     inspectedAt: new Date(d.inspectedAt),
     broodQuantity: d.broodQuantity,
     broodQuality: d.broodQuality,
+    broodFrames: d.broodFrames,
     queenSeen: d.queenSeen,
     queenAge: d.queenAge,
     foodStores: d.foodStores,
+    foodStoresKg: d.foodStoresKg,
     temperament: d.temperament,
     hygienicBehavior: d.hygienicBehavior,
     honeyIntakeG: d.honeyIntakeDailyG,
     healthStatus: d.healthStatus,
     treatmentApplied: d.treatmentApplied,
     treatmentSubstance: d.treatmentSubstance,
-    treatmentDate: new Date(d.treatmentDate),
+    treatmentDates: d.treatmentDates,
     swarmEvent: d.swarmEvent,
     swarmDestinationHiveId: d.swarmDestinationHiveId,
+    swarmText: d.swarmText,
     notes: d.notes,
     equipment: d.equipmentConditions,
   };
@@ -231,24 +242,28 @@ export default function NewInspectionScreen() {
           inspected_at: form.inspectedAt.toISOString(),
           brood_quantity: form.broodQuantity,
           brood_quality: form.broodQuality,
+          brood_frames: form.broodFrames,
           queen_seen: form.queenSeen ? 1 : 0,
           queen_age: form.queenAge,
           food_stores: form.foodStores,
+          food_stores_kg: form.foodStoresKg,
           temperament: form.temperament,
           hygienic_behavior: form.hygienicBehavior,
           honey_intake_daily_g: form.honeyIntakeG ? parseInt(form.honeyIntakeG, 10) : null,
           health_status: form.healthStatus,
           treatment_applied: form.treatmentApplied ? 1 : 0,
           treatment_substance: form.treatmentApplied ? form.treatmentSubstance || null : null,
-          treatment_date: form.treatmentApplied ? form.treatmentDate.toISOString() : null,
+          treatment_date: null,
           swarm_event: form.swarmEvent,
           swarm_destination_hive_id:
-            form.swarmEvent !== 'none' && form.swarmDestinationHiveId
+            (form.swarmEvent === 'natural' || form.swarmEvent === 'artificial') && form.swarmDestinationHiveId
               ? form.swarmDestinationHiveId
               : null,
+          swarm_new_hive_note: form.swarmEvent === 'razrojena' ? form.swarmText || null : null,
           notes: form.notes || null,
         },
-        form.equipment
+        form.equipment,
+        form.treatmentDates
       );
       await clearDraft();
       draftCleared.current = true;
@@ -307,6 +322,15 @@ export default function NewInspectionScreen() {
             onChange={(v) => set('broodQuantity', v as BroodQuantity)}
           />
         </FormField>
+        <FormField label={L.brojOkvirasLeglom}>
+          <NumericStepper
+            label={L.brojOkvirasLeglom}
+            value={form.broodFrames}
+            onChange={(v) => set('broodFrames', v)}
+            min={1}
+            max={20}
+          />
+        </FormField>
         <FormField label={L.kvalitetaLegla}>
           <SegmentedControl
             options={broodQualityOptions}
@@ -339,6 +363,15 @@ export default function NewInspectionScreen() {
             options={foodStoresOptions}
             value={form.foodStores}
             onChange={(v) => set('foodStores', v as FoodStores)}
+          />
+        </FormField>
+        <FormField label={L.kolicanaHrane}>
+          <NumericStepper
+            label={L.kolicanaHrane}
+            value={form.foodStoresKg}
+            onChange={(v) => set('foodStoresKg', v)}
+            min={1}
+            max={20}
           />
         </FormField>
 
@@ -381,6 +414,7 @@ export default function NewInspectionScreen() {
             options={healthStatusOptions}
             value={form.healthStatus}
             onChange={(v) => set('healthStatus', v as HealthStatus)}
+            wrap
           />
         </FormField>
 
@@ -389,7 +423,10 @@ export default function NewInspectionScreen() {
         <BooleanButtonField
           label={L.tretmanProveden}
           value={form.treatmentApplied}
-          onChange={(v) => set('treatmentApplied', v)}
+          onChange={(v) => {
+            setForm((prev) => ({ ...prev, treatmentApplied: v, treatmentDates: v ? prev.treatmentDates : [] }));
+            setIsDirty(true);
+          }}
           trueLabel={L.da}
           falseLabel={L.ne}
         />
@@ -397,8 +434,8 @@ export default function NewInspectionScreen() {
           <TreatmentFields
             substance={form.treatmentSubstance}
             onSubstanceChange={(v) => set('treatmentSubstance', v)}
-            treatmentDate={form.treatmentDate}
-            onTreatmentDateChange={(d) => set('treatmentDate', d)}
+            treatmentDates={form.treatmentDates}
+            onTreatmentDatesChange={(dates) => set('treatmentDates', dates)}
           />
         )}
 
@@ -411,7 +448,7 @@ export default function NewInspectionScreen() {
             onChange={(v) => set('swarmEvent', v as SwarmEvent)}
           />
         </FormField>
-        {form.swarmEvent !== 'none' && (
+        {(form.swarmEvent === 'natural' || form.swarmEvent === 'artificial') && (
           <FormField label={L.odredišnaKošnica}>
             {otherHives.length === 0 ? (
               <Text style={styles.noHivesText}>{L.nePostojeKošnice}</Text>
@@ -434,6 +471,18 @@ export default function NewInspectionScreen() {
                 })}
               </View>
             )}
+          </FormField>
+        )}
+        {form.swarmEvent === 'razrojena' && (
+          <FormField label={L.uKojuKosnicu}>
+            <TextInput
+              style={styles.input}
+              value={form.swarmText}
+              onChangeText={(v) => set('swarmText', v)}
+              placeholder={L.novaKosnica}
+              placeholderTextColor={colors.disabledText}
+              returnKeyType="done"
+            />
           </FormField>
         )}
 

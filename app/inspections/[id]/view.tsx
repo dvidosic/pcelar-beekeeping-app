@@ -11,6 +11,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useEquipmentConditions } from '@/hooks/useEquipmentConditions';
+import { useTreatmentDates } from '@/hooks/useTreatmentDates';
 import { getInspectionById } from '@/db/repositories/inspectionRepository';
 import { Inspection, HealthStatus, EquipmentConditionValue } from '@/types/inspection';
 import {
@@ -33,7 +34,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 
 function healthColor(status: HealthStatus | null): string {
   if (!status || status === 'healthy') return colors.success;
-  if (status === 'varroa' || status === 'nosema') return colors.danger;
+  if (status === 'varroa' || status === 'nosema' || status === 'tropileloza' || status === 'americka_gnjiloca') return colors.danger;
   return colors.warning;
 }
 
@@ -77,6 +78,7 @@ export default function InspectionDetailScreen() {
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { conditionMap } = useEquipmentConditions(id);
+  const { dates: treatmentDates } = useTreatmentDates(inspection ? id : null);
 
   useEffect(() => {
     getInspectionById(id).then((insp) => {
@@ -135,6 +137,9 @@ export default function InspectionDetailScreen() {
         {/* Brood */}
         <SectionHeader label={L.količinaLegla} />
         <DetailRow label={L.količinaLegla} value={labelFor(broodQuantityOptions, inspection.brood_quantity)} />
+        {inspection.brood_frames != null && (
+          <DetailRow label={L.brojOkvirasLeglom} value={String(inspection.brood_frames)} />
+        )}
         <DetailRow label={L.kvalitetaLegla} value={labelFor(broodQualityOptions, inspection.brood_quality)} />
 
         {/* Queen */}
@@ -145,6 +150,9 @@ export default function InspectionDetailScreen() {
         {/* Food */}
         <SectionHeader label={L.zaliheHrane} />
         <DetailRow label={L.zaliheHrane} value={labelFor(foodStoresOptions, inspection.food_stores)} />
+        {inspection.food_stores_kg != null && (
+          <DetailRow label={L.kolicanaHrane} value={`${inspection.food_stores_kg} kg`} />
+        )}
 
         {/* Temperament */}
         <SectionHeader label={L.temperament} />
@@ -174,18 +182,27 @@ export default function InspectionDetailScreen() {
         {inspection.treatment_applied === 1 && (
           <>
             <DetailRow label={L.sredstvoTretmana} value={inspection.treatment_substance ?? '—'} />
-            <DetailRow
-              label={L.datumTretmana}
-              value={inspection.treatment_date ? formatDate(inspection.treatment_date) : '—'}
-            />
+            {treatmentDates.length > 0
+              ? treatmentDates.map((d, i) => (
+                  <DetailRow
+                    key={d + i}
+                    label={i === 0 ? L.datumiTretmana : ''}
+                    value={formatDate(d)}
+                  />
+                ))
+              : <DetailRow label={L.datumiTretmana} value="—" />
+            }
           </>
         )}
 
         {/* Swarm */}
         <SectionHeader label={L.rojenje} />
         <DetailRow label={L.rojenje} value={labelFor(swarmEventOptions, inspection.swarm_event)} />
-        {inspection.swarm_event !== 'none' && (
+        {(inspection.swarm_event === 'natural' || inspection.swarm_event === 'artificial') && (
           <DetailRow label={L.odredišnaKošnica} value={swarmDestHive} />
+        )}
+        {inspection.swarm_event === 'razrojena' && inspection.swarm_new_hive_note && (
+          <DetailRow label={L.uKojuKosnicu} value={inspection.swarm_new_hive_note} />
         )}
 
         {/* Equipment */}

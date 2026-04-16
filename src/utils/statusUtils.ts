@@ -34,9 +34,11 @@ export function computeHiveStatus(
   if (
     health_status === 'varroa' ||
     health_status === 'nosema' ||
+    health_status === 'tropileloza' ||
+    health_status === 'americka_gnjiloca' ||
     brood_quality === 'poor' ||
     food_stores === 'low' ||
-    (temperament !== null && temperament >= 5)
+    (temperament !== null && temperament <= 1)
   ) {
     return 'danger';
   }
@@ -48,7 +50,7 @@ export function computeHiveStatus(
     hygienic_behavior === 'poor' ||
     (food_stores === 'adequate' && days > 21) ||
     swarm_event === 'natural' ||
-    temperament === 4
+    temperament === 2
   ) {
     return 'warning';
   }

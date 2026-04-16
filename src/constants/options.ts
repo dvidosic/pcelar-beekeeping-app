@@ -41,12 +41,15 @@ export const healthStatusOptions: SelectOption[] = [
   { value: 'varroa', label: L.varroa },
   { value: 'nosema', label: L.nosema },
   { value: 'other', label: L.ostalo },
+  { value: 'tropileloza', label: L.tropileloza },
+  { value: 'americka_gnjiloca', label: L.americkaGnjiloca },
 ];
 
 export const swarmEventOptions: SelectOption[] = [
   { value: 'none', label: L.bezRojenja },
   { value: 'natural', label: L.prirodniRoj },
   { value: 'artificial', label: L.umjetniRoj },
+  { value: 'razrojena', label: L.razrojena },
 ];
 
 export const equipmentConditionOptions: SelectOption[] = [

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { View, FlatList, Image, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHives } from '@/hooks/useHives';
@@ -25,6 +25,11 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Image
+        source={require('../../assets/app-logo.png')}
+        style={styles.watermark}
+        pointerEvents="none"
+      />
       <FlatList
         data={hives}
         keyExtractor={(item) => item.id}
@@ -70,5 +75,15 @@ const styles = StyleSheet.create({
   },
   listEmpty: {
     flex: 1,
+  },
+  watermark: {
+    position: 'absolute',
+    opacity: 0.07,
+    width: '70%',
+    height: undefined,
+    aspectRatio: 1,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    top: '30%',
   },
 });
